@@ -15,6 +15,7 @@ library(tidyverse)
 library(formatR)
 library(moderndive)
 
-wine_pinot <- read_rds("C:/Users/karol/Desktop/Machine Learning/Applied-Machine-Learning/pinot.rds")
+
+wine_pinot <- readRDS(gzcon(url("https://github.com/karolo89/machine_learning_assignment/raw/main/pinot.rds")))
 ```
 
