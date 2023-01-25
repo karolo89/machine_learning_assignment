@@ -7,7 +7,6 @@ editor: visual
 
 ## Predicting Province
 
-
 ```{r setup, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
@@ -18,3 +17,7 @@ library(moderndive)
 wine_pinot <- read_rds("C:/Users/karol/Desktop/Machine Learning/Applied-Machine-Learning/pinot.rds")
 ```
 
+```{r}
+#this is a test.
+
+```
