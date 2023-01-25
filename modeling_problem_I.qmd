@@ -20,9 +20,16 @@ wine_pinot <- readRDS(gzcon(url("https://github.com/karolo89/machine_learning_as
 
 ```{r}
 summary(wine_pinot)
-skim(wine_pinot)
 
 #adding log price column
-wine_pinot %>% 
+pinot <- wine_pinot %>% 
   mutate(lprice = log(price))
+
+pinot <- pinot %>%
+  mutate(id = as.factor(id))%>%
+  mutate(year = as.factor(year))%>%
+  select(id, year, province, lprice)
+
+skim(pinot)
+
 ```
