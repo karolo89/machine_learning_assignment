@@ -19,6 +19,5 @@ wine_pinot <- readRDS(gzcon(url("https://github.com/karolo89/machine_learning_as
 ```
 
 ```{r}
-#this is a test.
-
+summary(wine_pinot)
 ```
