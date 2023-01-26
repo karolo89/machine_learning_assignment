@@ -15,7 +15,8 @@ library(formatR)
 library(moderndive)
 library(skimr)
 
-wine_pinot <- readRDS(gzcon(url("https://github.com/karolo89/machine_learning_assignment/raw/main/pinot.rds")))
+wine_pinot <- readRDS(gzcon(url(
+  "https://github.com/karolo89/machine_learning_assignment/raw/main/pinot.rds")))
 ```
 
 ```{r}
@@ -26,9 +27,7 @@ pinot <- wine_pinot %>%
 
 pinot <- pinot %>%
   mutate(id = as.factor(id))%>%
-  mutate(year = as.factor(year))%>%
-  select(id, province, price, lprice, points, year,description)
-  #added back price (just in case), description - I think alot of great features will coming from mining that   text! 
+  mutate(year = as.factor(year))
 
 summary(pinot)
 
