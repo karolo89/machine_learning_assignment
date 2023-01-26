@@ -19,7 +19,6 @@ wine_pinot <- readRDS(gzcon(url("https://github.com/karolo89/machine_learning_as
 ```
 
 ```{r}
-summary(wine_pinot)
 
 #adding log price column
 pinot <- wine_pinot %>% 
@@ -31,7 +30,7 @@ pinot <- pinot %>%
   select(id, province, price, lprice, points, year,description)
   #added back price (just in case), description - I think alot of great features will coming from mining that   text! 
 
-
+summary(pinot)
 
 ```
 
@@ -41,14 +40,17 @@ pinot <- pinot %>%
 
 ```{r}
 pinot %>% group_by(province) %>% summarize(prov_freq = n(), percent_of_ds = round(prov_freq/8380,2))
+
 #nearly half of wines are californian, good to know... 
 
 pinot %>% filter(str_detect(description, "[Oo]ak")) %>% nrow()
+
 #1301/8380 have the work oak in description 
 
 pinot %>% filter(str_detect(description, "[Oo]ak")) %>% 
   group_by(province) %>% summarize(prov_freq = n(), oak_perc = round(prov_freq/1301,2))
-#it is likely California or Oregon if there is oak in the description 
+
+#it is likely California or Oregon if there is oak in the description
 
 #some french language patterns to think about developing a regex from: 
 # "_de_" / "d'"
@@ -66,12 +68,17 @@ pinot %>% group_by(province) %>% summarize(avgPrice = mean(price), avgPoints = m
 province_vec = c("Burgundy", "California", "Casablanca_Valley","Marlborough", "New_York", "Oregon")
 
 for(i in province_vec){
-  plot = ggplot(pinot %>% filter(province == i), aes(x = as.integer(year), y = points)) +      geom_point(alpha =.5, color = "red4") + ggtitle(i)
+  plot = ggplot(pinot %>% filter(province == i), aes(x = as.integer(year), y = points)) +      
+    geom_point(alpha =.5, color = "red4") + 
+    ggtitle(i)
+  
   print(plot)
 }
 
 for(i in province_vec){
-  plot2 = ggplot(pinot %>% filter(province == i), aes(x = as.integer(year))) + geom_histogram(binwidth =3, fill = "red4") + ggtitle(i)
+  plot2 = ggplot(pinot %>% filter(province == i), aes(x = as.integer(year))) + 
+    geom_histogram(binwidth =3, fill = "red4") + 
+    ggtitle(i)
   print(plot2)
 }
 
