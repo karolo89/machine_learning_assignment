@@ -40,7 +40,8 @@ summary(pinot)
 ```{r}
 pinot %>% 
   group_by(province) %>% 
-  summarize(prov_freq = n(), percent_of_ds = round(prov_freq/8380,2))
+  summarize(prov_freq = n(), 
+            percent_of_ds = round(prov_freq/8380,2))
 
 #nearly half of wines are californian, good to know... 
 
@@ -51,7 +52,8 @@ pinot %>%
 #1301/8380 have the work oak in description 
 
 pinot %>% filter(str_detect(description, "[Oo]ak")) %>% 
-  group_by(province) %>% summarize(prov_freq = n(), oak_perc = round(prov_freq/1301,2))
+  group_by(province) %>% summarize(prov_freq = n(), 
+                                   oak_perc = round(prov_freq/1301,2))
 
 #it is likely California or Oregon if there is oak in the description
 
@@ -61,7 +63,10 @@ pinot %>% filter(str_detect(description, "[Oo]ak")) %>%
 # accented letters: "é","ô",
 # "St."
 
-pinot %>% group_by(province) %>% summarize(avgPrice = mean(price), avgPoints = mean(points))
+pinot %>% 
+  group_by(province) %>% 
+  summarize(avgPrice = mean(price), 
+            avgPoints = mean(points))
 #Burgundy wines are on average significantly more expensive...and casablanca valley wines on average have the lowest price and score.  
 
 #which wines do people recommend waiting before drinking? i.e "drink from XXXX" 
