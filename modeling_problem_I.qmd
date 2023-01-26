@@ -36,14 +36,17 @@ summary(pinot)
 
 **Preliminary EDA, Feature Engineering Brainstorm, Initial Thoughts**
 
-1/25/23, CWH
 
 ```{r}
-pinot %>% group_by(province) %>% summarize(prov_freq = n(), percent_of_ds = round(prov_freq/8380,2))
+pinot %>% 
+  group_by(province) %>% 
+  summarize(prov_freq = n(), percent_of_ds = round(prov_freq/8380,2))
 
 #nearly half of wines are californian, good to know... 
 
-pinot %>% filter(str_detect(description, "[Oo]ak")) %>% nrow()
+pinot %>% 
+  filter(str_detect(description, "[Oo]ak")) %>% 
+  nrow()
 
 #1301/8380 have the work oak in description 
 
@@ -68,17 +71,21 @@ pinot %>% group_by(province) %>% summarize(avgPrice = mean(price), avgPoints = m
 province_vec = c("Burgundy", "California", "Casablanca_Valley","Marlborough", "New_York", "Oregon")
 
 for(i in province_vec){
-  plot = ggplot(pinot %>% filter(province == i), aes(x = as.integer(year), y = points)) +      
+  plot = ggplot(pinot %>% 
+                  filter(province == i), aes(x = as.integer(year), y = points)) +      
     geom_point(alpha =.5, color = "red4") + 
-    ggtitle(i)
+    ggtitle(i)+
+    theme_minimal()
   
   print(plot)
 }
 
 for(i in province_vec){
-  plot2 = ggplot(pinot %>% filter(province == i), aes(x = as.integer(year))) + 
+  plot2 = ggplot(pinot %>% 
+                   filter(province == i), aes(x = as.integer(year))) + 
     geom_histogram(binwidth =3, fill = "red4") + 
-    ggtitle(i)
+    ggtitle(i)+
+    theme_minimal()
   print(plot2)
 }
 
