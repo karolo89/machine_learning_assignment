@@ -2,7 +2,6 @@
 title: "Modeling Problem I"
 author: "Karol Orozco & Charles Hanks"
 format: pdf
-editor: visual
 ---
 
 ## Predicting Province
@@ -35,7 +34,6 @@ summary(pinot)
 
 **Preliminary EDA, Feature Engineering Brainstorm, Initial Thoughts**
 
-
 ```{r}
 pinot %>% 
   group_by(province) %>% 
@@ -66,13 +64,15 @@ pinot %>%
   group_by(province) %>% 
   summarize(avgPrice = mean(price), 
             avgPoints = mean(points))
-#Burgundy wines are on average significantly more expensive...and casablanca valley wines on average have the lowest price and score.  
+# Burgundy wines are on average significantly more expensive...
+# and casablanca valley wines on average have the lowest price and score.  
 
 #which wines do people recommend waiting before drinking? i.e "drink from XXXX" 
 
 #some words to check out: "edge","tannins","dense","firm", oregon pinot is fruity. 
 
-province_vec = c("Burgundy", "California", "Casablanca_Valley","Marlborough", "New_York", "Oregon")
+province_vec = c("Burgundy", "California", "Casablanca_Valley","Marlborough", 
+                 "New_York", "Oregon")
 
 for(i in province_vec){
   plot = ggplot(pinot %>% 
@@ -96,8 +96,43 @@ for(i in province_vec){
 #Some findings from viz:
 #california pinot noir production did not begin until ~2008, then exploded! 
 #before year 2000, likely to be oregon 
-#burgundy pinots score high around 2005, after almost no burgundy pinots between 2000 and 2005
+#burgundy pinots score high around 2005, 
+#after almost no burgundy pinots between 2000 and 2005
 #California pinot game WAY STRONG between 2010 and 2015
 #New York pinot score high between 2008 and 2015 
 #What happened around 2014?? Counts drop across provinces....
 ```
+## Preprocessing (3pts)
+
+1. Preprocess the dataframe that you created in the previous question using centering and scaling of the numeric features
+2. Create dummy variables for the year factor column
+
+```{r}
+
+```
+
+
+## Running KNN (5pts)
+
+1. Split your data into an 80/20 training and test set
+2. Use Caret to run a KNN model that uses your engineered features to predict province
+  - use 5-fold cross validated subsampling 
+  - allow Caret to try 15 different values for K
+3. Display the confusion matrix on the test data
+
+
+```{r}
+
+```
+
+## Kappa (2pts)
+
+Is this a good value of Kappa? Why or why not?
+
+**Answer:** (write your answer here)
+
+## Improvement (2pts)
+
+Looking at the confusion matrix, where do you see room for improvement in your predictions?
+
+**Answer:** (write your answer here)
