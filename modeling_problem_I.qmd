@@ -102,24 +102,25 @@ for(i in province_vec){
 #New York pinot score high between 2008 and 2015 
 #What happened around 2014?? Counts drop across provinces....
 ```
+
 ## Preprocessing (3pts)
 
-1. Preprocess the dataframe that you created in the previous question using centering and scaling of the numeric features
-2. Create dummy variables for the year factor column
+1.  Preprocess the dataframe that you created in the previous question using centering and scaling of the numeric features
+2.  Create dummy variables for the year factor column
 
 ```{r}
 
 ```
 
-
 ## Running KNN (5pts)
 
-1. Split your data into an 80/20 training and test set
-2. Use Caret to run a KNN model that uses your engineered features to predict province
-  - use 5-fold cross validated subsampling 
-  - allow Caret to try 15 different values for K
-3. Display the confusion matrix on the test data
+1.  Split your data into an 80/20 training and test set
+2.  Use Caret to run a KNN model that uses your engineered features to predict province
 
+-   use 5-fold cross validated subsampling
+-   allow Caret to try 15 different values for K
+
+3.  Display the confusion matrix on the test data
 
 ```{r}
 
@@ -136,3 +137,124 @@ Is this a good value of Kappa? Why or why not?
 Looking at the confusion matrix, where do you see room for improvement in your predictions?
 
 **Answer:** (write your answer here)
+
+## Group Activity: Naive Bayes Model
+
+Use the top words by province to...
+
+
+1\. Engineer more features that capture the essence of Casablanca, Marlborough and New York
+
+2. Look for difference between California and Oregon
+
+3\. Use what you find to run naive Bayes models that achieve a Kappa that approaches 0.5
+
+```{r}
+library(tidytext)
+library(caret)
+wine = wine_pinot
+names(wine)[names(wine) == 'id'] = 'ID'
+```
+
+Document term matrix:
+
+```{r}
+df <- wine %>%
+  unnest_tokens(word, description) %>%
+  anti_join(stop_words) %>% # get rid of stop words
+  filter(word != "wine") %>%
+  filter(word != "pinot") %>%
+  count(ID, word) %>% 
+  group_by(ID) %>% 
+  mutate(freq = n/sum(n)) %>% 
+  mutate(exists = (n>0)) %>% 
+  ungroup %>% 
+  group_by(word) %>% 
+  mutate(total = sum(n))
+```
+
+Pivot wide and rejoin with wine:
+
+```{r}
+wino <- df %>% 
+  filter(total > 900) %>% 
+  pivot_wider(id_cols = ID, names_from = word, values_from = exists, values_fill = list(exists=0)) %>% 
+  merge(select(wine,ID, province), all.y=TRUE) #%>% 
+  #drop_na()
+
+#wino <- merge(select(wine,ID, province), wino, by="ID", all.x=TRUE) %>%
+#  arrange(ID)
+#View(wino)
+wino <- replace(wino, is.na(wino), FALSE)
+```
+
+Visualizing distribution to select distinct features for provinces:
+
+```{r}
+df %>% 
+  left_join(select(wine, ID, province), by = "ID") %>% 
+  count(province, word) %>%
+  group_by(province) %>% 
+  top_n(10,n) %>% 
+  arrange(province, desc(n)) %>% 
+  ggplot(aes(x = word, y = n, fill = province)) + geom_col() + coord_flip()
+```
+
+```{r}
+wino = wino %>% select(ID, province, tart, plum, oak, bodied,black,nose,palate,ripe,cherry,tannins,drink)
+```
+
+train & test model:
+
+```{r}
+wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
+train <- wino[ wine_index, ]
+test <- wino[-wine_index, ]
+
+fit <- train(province ~ .,
+             data = train, 
+             method = "naive_bayes",
+             tuneGrid = expand.grid(usekernel = c(T,F), laplace = T, adjust = T),
+             metric = "Kappa",
+             trControl = trainControl(method = "cv"))
+
+
+confusionMatrix(predict(fit, test),factor(test$province))
+
+```
+
+Creating more features
+
+```{r}
+
+features = wine %>% 
+  mutate(aging = str_detect(description,"aging"),
+         chocolate =  str_detect(description, "chocolate"),
+         vineyard = str_detect(description, "vineyard")) %>% 
+            select(ID,aging,chocolate,vineyard)
+
+wino2 = wino %>%
+  left_join(features, by = "ID")
+
+
+```
+
+Test 2
+
+```{r}
+wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
+train <- wino2[ wine_index, ]
+test <- wino2[-wine_index, ]
+
+fit <- train(province ~ .,
+             data = train, 
+             method = "naive_bayes",
+             tuneGrid = expand.grid(usekernel = c(T,F), laplace = T, adjust = T),
+             metric = "Kappa",
+             trControl = trainControl(method = "cv"))
+fit
+
+confusionMatrix(predict(fit, test),factor(test$province))
+
+#Higher kappa value, but now model is not predicting any of the sparse provinces
+```
