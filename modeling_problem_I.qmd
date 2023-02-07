@@ -313,3 +313,8 @@ confusionMatrix(predict(fit, test),factor(test$province))
 
 #Higher kappa value, but now model is not predicting any of the sparse provinces
 ```
+
+```{r}
+#test change 
+```
+
