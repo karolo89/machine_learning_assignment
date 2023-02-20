@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(caret)
 library(rpart)
+library(scales)
 
 wine = read_rds("pinot.rds")
 
@@ -78,7 +79,69 @@ wino2 = wino2 %>%
     year >= 2011 ~ "current"
   ))
 
+wino2 = wino2 %>% dplyr::select(-price)
+
+#####
+
+#creating a DTM of all words from description col: 
+
+all_words = wine %>% 
+  unnest_tokens(word, description) %>% # output is word column, input is description column
+  anti_join(stop_words) %>% #removing stopwords from word col 
+  filter(word !="wine") %>% filter(word != "pinot") %>% 
+  count(id, word) %>% 
+  group_by(id) %>% 
+  mutate(freq = n/sum(n)) %>% # frequency of that word
+  mutate(exists = (n>0)) %>% 
+  ungroup %>% 
+  group_by(word) %>% 
+  mutate(total = sum(n)) %>% 
+  pivot_wider(id_cols = id, names_from = word, values_from = exists, values_fill = list(exists=0)) 
+
+all_words = all_words %>% ungroup 
+
+#adding feature 'tight': 
+tight_wine = all_words %>% select(id, tight)
+wino2 = wino2 %>% inner_join(tight_wine, by = 'id')
+
+#adding feature 'blackberry'
+blackberry = all_words %>% select(id, blackberry)
+wino2 = wino2 %>% inner_join(blackberry, by = 'id')
+
+#pepper? 
+all_words %>% select(id, pepper) 
+pepper = all_words %>% select(id, pepper)
+
+wino2 = wino2 %>% inner_join(pepper, by = 'id')
+
+wino2 %>% filter(pepper == TRUE) %>% group_by(province) %>% count()
 ```
+
+Improving prediction between Marlborough and Oregon: 
+
+```{r}
+wtxt %>% 
+    filter(province=="Oregon" | province=="Marlborough") %>% 
+    filter(!(word %in% c("wine","pinot","drink","noir","vineyard","palate","notes","flavors","bottling"))) %>% 
+    filter(total > 300) %>% 
+    group_by(province, word) %>%
+    count() %>% 
+    group_by(province) %>% 
+    mutate(proportion = n / sum(n)) %>% 
+    pivot_wider(id_cols = word, names_from = province, values_from = proportion) %>% 
+    ggplot(aes(x = Oregon, y = Marlborough, color = abs(Oregon - Marlborough))) +
+    geom_abline(color = "gray40", lty = 2) +
+    geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+    geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+    scale_x_log10(labels = percent_format()) +
+    scale_y_log10(labels = percent_format()) +
+    scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+    theme(legend.position="none") +
+    labs(x = "Oregon", y = "Marlborough", title = "Words describing Pinot Noir from Marlborough and Oregon")
+
+#tight, blackberry 
+```
+
 
 
 ## Specification
@@ -102,6 +165,14 @@ fit <- train(province ~ .,
 
 confusionMatrix(predict(fit, test),factor(test$province))
 ```
+
+
+
+
+
+
+
+
 
 
 ## Best model
