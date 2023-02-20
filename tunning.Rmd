@@ -1,21 +1,24 @@
 ---
-title: "Modeling Assignment 1, Hendrik's benchmark"
+title: "Logistic regression and Random Forest"
+author: "Charles & Karol"
+date: "2023-02-17"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-```
 
 ## Setup
 
-```{r}
+
 # add your libraries
 library(tidyverse)
 library(caret)
 library(rpart)
+library(randomForest)
 
-wine = read_rds("pinot.rds")
+wine = readRDS(gzcon(url(
+"https://github.com/karolo89/machine_learning_assignment/raw/main/pinot.rds")))
 
 ```
 
@@ -62,7 +65,6 @@ wino2 = wino %>% left_join(select(wine, id, price, points, year), by = "id")
 wino2 = wino2 %>% mutate(year_f = as.factor(year), 
                          lprice = log(price))
 
-
 #binning year and and price: 
 wino2 = wino2 %>% 
   mutate(price_f = case_when(
@@ -76,30 +78,36 @@ wino2 = wino2 %>%
     year >= 2011 ~ "current"
   ))
 
-```
+preProcess(wino2, method = "center", "scale", "pca")
 
+
+head(wino2)
+
+```
 
 ## Specification
 
 ```{r}
-# specify the model to be used (i.e. KNN or Naive Bayes) and the tuning parameters used
 
-ctrl <- trainControl(method = "cv", number = 5)
 
-set.seed(504) 
+control <- trainControl(method='repeatedcv', 
+                        number=10, 
+                        repeats=3,
+                        search = 'random')
 
-wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
-train <- wino2[ wine_index, ]
-test <- wino2[-wine_index, ]
-
-fit <- train(province ~ .,
-             data = train, 
-             method = "rf",
-             trControl = ctrl,
-             metric = "Kappa")
+#Random generate 15 mtry values with tuneLength = 15
+set.seed(504)
+fit  <- train(province ~ .,
+                   data = train,
+                   method = 'rf',
+                   metric = "Kappa",
+                   tuneLength  = 15, 
+                   trControl = control)
 
 confusionMatrix(predict(fit, test),factor(test$province))
+
 ```
+
 
 
 ## Best model
@@ -116,7 +124,7 @@ print(fit$bestTune)
 ```{r}
 # the "method" below should match the one you chose above. 
 
-set.seed(1504) # I will choose a different seed for evaluation
+set.seed(504) # I will choose a different seed for evaluation
 
 wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
 train <- wino2[ wine_index, ]
@@ -125,10 +133,13 @@ test <- wino2[-wine_index, ]
 # example spec for knn
 fit_final <- train(province ~ .,
              data = train, 
-             method = "rpart",
+             method = "rf",
              tuneGrid=fit$bestTune) 
+
 # The last line means we will fit a model using the best tune parameters your CV found above.
 
 confusionMatrix(predict(fit_final, test),factor(test$province))
 ```
+
+
 
