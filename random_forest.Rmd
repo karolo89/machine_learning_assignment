@@ -63,8 +63,6 @@ wino2 = wino %>% left_join(select(wine, id, price, points, year), by = "id")
 wino2 = wino2 %>% mutate(year_f = as.factor(year), 
                          lprice = log(price))
 
-#center and scale points: 
-wino2 = wino2 %>% select(points) %>% preProcess(method = c("center", "scale")) %>% predict(wino2)
 
 #binning year and and price: 
 wino2 = wino2 %>% 
