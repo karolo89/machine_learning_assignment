@@ -1,0 +1,138 @@
+---
+title: "Logistic Regression"
+format: pdf
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## Setup
+
+
+# add your libraries
+library(tidyverse)
+library(caret)
+library(rpart)
+library(scales)
+library(fastDummies)
+
+wine = readRDS(gzcon(url(
+"https://github.com/karolo89/machine_learning_assignment/raw/main/pinot.rds")))
+
+```
+
+
+## text feature engineering: 
+```{r}
+wine_words <- function(df, j = 1000, stem=F){ 
+  library(tidytext)
+  library(SnowballC)
+  data(stop_words)
+  words <- df %>%
+    unnest_tokens(word, description) %>%
+    anti_join(stop_words) %>% # get rid of stop words
+    filter(!(word %in% c("wine","pinot","vineyard", "price", "points")))
+  
+  if(stem){
+    words <- words %>% 
+      mutate(word = wordStem(word))
+  }
+  
+  words <- words %>% 
+    count(id, word) %>% 
+    group_by(id) %>% 
+    mutate(exists = (n>0)) %>% 
+    ungroup %>% 
+    group_by(word) %>% 
+    mutate(total = sum(n)) %>% 
+    filter(total > j) %>% 
+    pivot_wider(id_cols = id, names_from = word, values_from = exists, values_fill = list(exists=0)) %>% 
+    right_join(select(df,id,province)) %>% 
+    mutate(across(-province, ~replace_na(.x, F)))
+}
+wino <- wine_words(wine, j=400, stem=F)
+```
+
+bringing back numerical features from original dataset to wino: 
+```{r}
+wino = wino %>% left_join(select(wine, id, price, points, year), by = "id")
+```
+
+Numerical feature engineering: 
+```{r}
+#center and scale points: 
+wino = wino %>% select(points) %>% preProcess(method = c("center", "scale")) %>% predict(wino)
+
+
+#year as factor, logprice: 
+wino = wino %>% mutate(year_f = as.factor(year), 
+                         lprice = log(price))
+#binning year and and price: 
+wino = wino %>% 
+  mutate(price_f = case_when(
+    price < 16 ~ "low",
+    price >= 16 & price < 41 ~ "med",
+    price >= 41 ~ "high"
+  ), 
+   year_f = case_when(
+    year < 2005 ~ "old",
+    year >= 2005 & year < 2011 ~ "recent",
+    year >= 2011 ~ "current"
+  ))
+wino = wino %>% dplyr::select(-price)
+#difference of wine's lprice from total average lprice
+wino = wino %>% mutate(diff_from_avg_lprice = mean(lprice) - lprice)
+wino = wino %>% mutate(cost_per_point = lprice/points) 
+wino = wino %>% select(-id)
+wino = wino %>% select(-diff_from_avg_lprice)
+
+head(wino)
+
+```
+
+
+## Split the data
+
+```{r}
+set.seed(1000) 
+wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE) 
+
+train <- wino[ wine_index, ] 
+test <- wino[-wine_index, ] 
+
+table(train$province)
+```
+
+
+```{r}
+# Fit the mode
+
+control <- trainControl(method="cv", 
+                          number=10, 
+                          savePredictions="all",
+                          classProbs=TRUE)
+
+model <- nnet::multinom(province ~., 
+                        data = train,
+                        trControl=control)
+# Summarize the model
+summary(model)
+# Make predictions
+predicted.classes <- model %>% predict(test)
+head(predicted.classes)
+```
+
+
+```{r}
+# Model accuracy
+mean(predicted.classes == test$province)
+```
+
+```{r}
+varImp(model)%>%
+  arrange(desc(Overall))
+
+```
+
+
