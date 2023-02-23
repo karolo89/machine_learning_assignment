@@ -1,8 +1,7 @@
 ---
-title: "Logistic regression and Random Forest"
-author: "Charles & Karol"
-date: "2023-02-17"
-output: html_document
+title: "Logistic Regression"
+author: "Karol Orozco & Charles Hanks"
+format: pdf
 ---
 
 ```{r setup, include=FALSE}
@@ -15,7 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(caret)
 library(rpart)
-library(randomForest)
+library(scales)
+library(fastDummies)
 
 wine = readRDS(gzcon(url(
 "https://github.com/karolo89/machine_learning_assignment/raw/main/pinot.rds")))
@@ -23,20 +23,16 @@ wine = readRDS(gzcon(url(
 ```
 
 
-## Feature Engineering
-
+## text feature engineering: 
 ```{r}
-# create some cool features. Make sure you add comments so I know what you are trying to accomplish!
-
 wine_words <- function(df, j = 1000, stem=F){ 
   library(tidytext)
   library(SnowballC)
   data(stop_words)
-
   words <- df %>%
     unnest_tokens(word, description) %>%
     anti_join(stop_words) %>% # get rid of stop words
-    filter(!(word %in% c("wine","pinot","vineyard")))
+    filter(!(word %in% c("wine","pinot","vineyard", "price", "points")))
   
   if(stem){
     words <- words %>% 
@@ -55,18 +51,25 @@ wine_words <- function(df, j = 1000, stem=F){
     right_join(select(df,id,province)) %>% 
     mutate(across(-province, ~replace_na(.x, F)))
 }
+wino <- wine_words(wine, j=400, stem=F)
+```
 
-wino <- wine_words(wine, j=500, stem=F)
+bringing back numerical features from original dataset to wino: 
+```{r}
+wino = wino %>% left_join(select(wine, id, price, points, year), by = "id")
+```
 
-#joining wino back with price, points, year for more feature engineering:
-wino2 = wino %>% left_join(select(wine, id, price, points, year), by = "id")
+Numerical feature engineering: 
+```{r}
+#center and scale points: 
+wino = wino %>% select(points) %>% preProcess(method = c("center", "scale")) %>% predict(wino)
 
-#adding year as factor col, log of price:
-wino2 = wino2 %>% mutate(year_f = as.factor(year), 
+
+#year as factor, logprice: 
+wino = wino %>% mutate(year_f = as.factor(year), 
                          lprice = log(price))
-
 #binning year and and price: 
-wino2 = wino2 %>% 
+wino = wino %>% 
   mutate(price_f = case_when(
     price < 16 ~ "low",
     price >= 16 & price < 41 ~ "med",
@@ -77,69 +80,74 @@ wino2 = wino2 %>%
     year >= 2005 & year < 2011 ~ "recent",
     year >= 2011 ~ "current"
   ))
+wino = wino %>% dplyr::select(-price)
+#difference of wine's lprice from total average lprice
+wino = wino %>% mutate(diff_from_avg_lprice = mean(lprice) - lprice)
+wino = wino %>% mutate(cost_per_point = lprice/points) 
+wino = wino %>% select(-id)
+wino = wino %>% select(-diff_from_avg_lprice)
 
-preProcess(wino2, method = "center", "scale", "pca")
-
-
-head(wino2)
+head(wino)
 
 ```
 
-## Specification
+
+Split data
+```{r}
+set.seed(504) 
+wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE) 
+
+train <- wino[ wine_index, ] 
+test <- wino[-wine_index, ] 
+
+table(train$province)
+
+nrow(train)
+nrow(test)
+
+
+```
+
+Fit Model
 
 ```{r}
+# Fit the mode
 
+control <- trainControl(method="cv", 
+                          number=5, 
+                          savePredictions="all",
+                          classProbs=TRUE)
 
-control <- trainControl(method='repeatedcv', 
-                        number=10, 
-                        repeats=3,
-                        search = 'random')
- x
-#Random generate 15 mtry values with tuneLength = 15
-set.seed(504)
-fit  <- train(province ~ .,
-                   data = train,
-                   method = 'rf',
-                   metric = "Kappa",
-                   tuneLength  = 15, 
-                   trControl = control)
+model <- nnet::multinom(province ~., 
+                        data = train,
+                        trControl=control)
 
-confusionMatrix(predict(fit, test),factor(test$province))
+print(model)
 
+# Summarize the model
+summary(model)
+
+# Make predictions
+preds <- predict(model, type="class", newdata=test)
+
+head(preds)
 ```
 
-
-
-## Best model
 
 ```{r}
-# Here are a few lines to inspect your best model. Add some comments about optimal hyperparameters.
-print(fit)
-print(fit$bestTune)
+postResample(test$province,preds)
 ```
-
-
-## Re-fit and evaluation
 
 ```{r}
-# the "method" below should match the one you chose above. 
+varImp(model)%>%
+  arrange(desc(Overall))
 
-set.seed(504) # I will choose a different seed for evaluation
-
-wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
-train <- wino2[ wine_index, ]
-test <- wino2[-wine_index, ]
-
-# example spec for knn
-fit_final <- train(province ~ .,
-             data = train, 
-             method = "rf",
-             tuneGrid=fit$bestTune) 
-
-# The last line means we will fit a model using the best tune parameters your CV found above.
-
-confusionMatrix(predict(fit_final, test),factor(test$province))
 ```
 
+
+```{r}
+confusionMatrix(predict(model, test),factor(test$province))
+
+```
 
 
