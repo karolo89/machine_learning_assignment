@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(caret)
 library(rpart)
+library(scales)
 
 wine = read_rds("pinot.rds")
 
@@ -53,7 +54,7 @@ wine_words <- function(df, j = 1000, stem=F){
     mutate(across(-province, ~replace_na(.x, F)))
 }
 
-wino <- wine_words(wine, j=500, stem=F)
+wino <- wine_words(wine, j=300, stem=T)
 
 #joining wino back with price, points, year for more feature engineering:
 wino2 = wino %>% left_join(select(wine, id, price, points, year), by = "id")
@@ -62,8 +63,6 @@ wino2 = wino %>% left_join(select(wine, id, price, points, year), by = "id")
 wino2 = wino2 %>% mutate(year_f = as.factor(year), 
                          lprice = log(price))
 
-#center and scale points: 
-wino2 = wino2 %>% select(points) %>% preProcess(method = c("center", "scale")) %>% predict(wino2)
 
 #binning year and and price: 
 wino2 = wino2 %>% 
@@ -78,10 +77,85 @@ wino2 = wino2 %>%
     year >= 2011 ~ "current"
   ))
 
+wino2 = wino2 %>% dplyr::select(-price)
+
+#difference of wine's lprice from total average lprice
+wino2 = wino2 %>% mutate(diff_from_avg_lprice = median(lprice) - lprice)
+
+#####
+
+#creating a DTM of all words from description col: 
+
+all_words = wine %>% 
+  unnest_tokens(word, description) %>% # output is word column, input is description column
+  anti_join(stop_words) %>% #removing stopwords from word col 
+  filter(word !="wine") %>% filter(word != "pinot") %>% 
+  count(id, word) %>% 
+  group_by(id) %>% 
+  mutate(freq = n/sum(n)) %>% # frequency of that word
+  mutate(exists = (n>0)) %>% 
+  ungroup %>% 
+  group_by(word) %>% 
+  mutate(total = sum(n)) %>% 
+  pivot_wider(id_cols = id, names_from = word, values_from = exists, values_fill = list(exists=0)) 
+
+all_words = all_words %>% ungroup 
+
+#adding feature 'tight': 
+tight_wine = all_words %>% select(id, tight)
+wino2 = wino2 %>% inner_join(tight_wine, by = 'id')
+
+#adding feature 'blackberry'
+blackberry = all_words %>% select(id, blackberry)
+wino2 = wino2 %>% inner_join(blackberry, by = 'id')
+
+#pepper? 
+all_words %>% select(id, pepper) 
+pepper = all_words %>% select(id, pepper)
+
+wino2 = wino2 %>% inner_join(pepper, by = 'id')
+
+wino2 %>% filter(pepper == TRUE) %>% group_by(province) %>% count()
+
+rhubarb = all_words %>% select(id, rhubarb)
+
+wino2 = wino2 %>% inner_join(rhubarb, by = 'id')
+
+wino2 %>% filter(rhubarb == TRUE) %>% group_by(province) %>% count()
+
+ny_state_of_mind = all_words %>% select(id, starts_with(c('ruddy','lakes','finger')))
+
+wino2 = wino2 %>% inner_join(ny_state_of_mind, by = 'id')
+
+```
+
+Improving prediction between Marlborough and Oregon: 
+
+```{r}
+wtxt %>% 
+    filter(province=="New_York" | province=="California") %>% 
+    filter(!(word %in% c("wine","pinot","drink","noir","vineyard","palate","notes","flavors","bottling"))) %>% 
+    filter(total > 300) %>% 
+    group_by(province, word) %>%
+    count() %>% 
+    group_by(province) %>% 
+    mutate(proportion = n / sum(n)) %>% 
+    pivot_wider(id_cols = word, names_from = province, values_from = proportion) %>% 
+    ggplot(aes(x = New_York, y = California, color = abs(New_York - California))) +
+    geom_abline(color = "gray40", lty = 2) +
+    geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+    geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+    scale_x_log10(labels = percent_format()) +
+    scale_y_log10(labels = percent_format()) +
+  
+    scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+    theme(legend.position="none") +
+    labs(x = "New_York", y = "California", title = "Words describing Pinot Noir from NY and CA")
+
+#tight, blackberry 
 ```
 
 
-## Specification
 
 ```{r}
 # specify the model to be used (i.e. KNN or Naive Bayes) and the tuning parameters used
@@ -101,14 +175,154 @@ fit <- train(province ~ .,
              metric = "Kappa")
 
 confusionMatrix(predict(fit, test),factor(test$province))
+
+
 ```
+
+Adding strong marlborough / weak oregon words in hopes to make distinction more clear for model: 
+```{r}
+#confirming they don't exist yet in my feature set: 
+wino2 %>% select(savory)
+wino2 %>% select(clove)
+wino2 %>% select(crisp)
+
+head(wino2)
+
+scc = all_words %>% select(id, savory, clove, crisp) 
+
+wino2 = wino2 %>% inner_join(scc, by = 'id')
+
+
+wino2 %>% select()
+#add: vanilla, structured, complex, dense, estate, smoky
+
+scc2 = all_words %>% select(id, structured, complex, dense, estate, smoky)
+wino2 = wino2 %>% inner_join(scc2, by = "id")
+wino2
+
+scc3 = all_words %>% select(id, hint, hints, tannin, aging)
+wino2 = wino2 %>% inner_join(scc3, by = "id")
+
+delicious_wood = all_words %>% select(id, wood, delicious)
+
+wino2 = wino2 %>% inner_join(delicious_wood, by = "id")
+
+```
+
+price per point feature? 
+```{r}
+wino2 %>% mutate(price_per_point = lprice/points)
+cost_per_point = wine %>% mutate(cost_per_point = price/points) %>% select(id, cost_per_point)
+
+wino2 = wino2 %>% inner_join(cost_per_point, by = "id")
+
+```
+wines_per_year
+```{r}
+
+```
+
+
+
+
+## Hyperparameter tuning 
+
+Number of trees (ntree), weights
+```{r}
+#calculating how much we want to weight each province, if CA is 1. 
+
+total = wine %>% nrow()
+province_dist = wine %>% group_by(province) %>% count() %>% mutate(prop = n/total) 
+
+
+ca_prop = as.numeric(province_dist[2,'prop'])
+province_dist = province_dist %>% mutate(rel_to_CA = ca_prop/prop)
+
+weighted_wine = train %>% 
+  mutate(weights = case_when(
+    province == "Burgundy" ~ as.numeric(province_dist[1,4]),
+    province == "California" ~ as.numeric(province_dist[2,4]),
+    province == "Casablanca_Valley" ~ as.numeric(province_dist[3,4]),
+    province == "Marlborough" ~ as.numeric(province_dist[4,4]),
+    province == "New_York" ~ as.numeric(province_dist[5,4]),
+    province == "Oregon" ~ as.numeric(province_dist[6,4]),
+  ))
+
+tuneGrid = expand.grid(mtry = seq(8,60,4))
+
+fit2 = train(province ~., 
+             data = train, 
+             method = 'rf',
+             tuneGrid = tuneGrid,
+             ntree = 1000,
+             weights = weighted_wine$weights,
+             trControl = ctrl, 
+             )
+
+#The final value used for the model was mtry = 8
+#that makes sense...sqrt(75) is 8.66
+#perhaps I tune mtry again to choose between 7,8,9,10
+
+tuneGrid = expand.grid(mtry =8)
+
+fit3 = train(province ~., 
+             data = train, 
+             method = 'rf',
+             ntree = 700,
+             tuneGrid = tuneGrid,
+             weights = weighted_wine$weights,
+             trControl = ctrl, 
+             )
+
+#yup, mtry =8 wins
+
+
+confusionMatrix(predict(fit3, test),factor(test$province))
+#it is not doing a great job at predicting new york. 
+
+importance = varImp(fit3)
+plot(importance)
+```
+
+
+
+
+
+'ranger' rf method 
+```{r}
+nodesize = c(1:10)
+mtry = 8
+
+tuneGrid2 = expand.grid(mtry = seq(6,10,2), splitrule = c("gini", "extratrees"), min.node.size = seq(1,10,1))
+
+
+#trying 'ranger' random forest model, from list of available models in caret <https://topepo.github.io/caret/available-models.html>
+fit4 = train(province ~., 
+             data = train, 
+             method = 'ranger',
+             tuneGrid = tuneGrid2,
+             weights = weighted_wine$weights,
+             trControl = ctrl, 
+             )
+
+print(fit4$bestTune)
+
+confusionMatrix(predict(fit4, test),factor(test$province))
+#verdict: not awesome
+
+```
+
+
+
+
+
 
 
 ## Best model
 
 ```{r}
 # Here are a few lines to inspect your best model. Add some comments about optimal hyperparameters.
-print(fit)
+print(fit2)
 print(fit$bestTune)
 ```
 
@@ -127,8 +341,8 @@ test <- wino2[-wine_index, ]
 # example spec for knn
 fit_final <- train(province ~ .,
              data = train, 
-             method = "rpart",
-             tuneGrid=fit$bestTune) 
+             method = "ranger",
+             tuneGrid=fit4$bestTune) 
 # The last line means we will fit a model using the best tune parameters your CV found above.
 
 confusionMatrix(predict(fit_final, test),factor(test$province))
