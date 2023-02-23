@@ -159,38 +159,12 @@ ny_words = ny_words %>% mutate(ny = gsub('TRUE','',name)) %>% select(ny)
 ny_words$id = seq(1,nrow(ny_words),1)
 
 rownames(ny_words) = NULL
-
-ny_words = data.frame(ny_words)
 wino_vec = data.frame(colnames(wino))
+colnames(wino_vec)[1] = "features"
 
-wino_vec = vector(wino_vec)
-wino_vec$id = seq(1,nrow(wino_vec),1)
+unique_words = setdiff(ny_words$ny,wino_vec$features)
 
-wino_vec$wino_vec
-class(wino_vec)
-arrange(wino_vec)
-
-words = vector()
-
-for(i in length(ny_words$ny)){
-  if (ny_words$ny[i] %in% wino_vec$wino_vec){
-    print("it's there")
-  } else{
-    print(ny_words$ny[i])
-  }
-}
-
-for (i in 1:length(ny_words$ny)){
-  print(ny_words$ny[1] %in% wino_vec$wino_vec)
-}
-
-
-cbind(ny_words$ny,wino_vec$wino_vec)
-
-unique_words = setdiff(ny_words$ny,wino_vec$wino_vec)
-
-sort(ny_words$ny)
-sort(wino_vec$wino_vec)
+#all the top words in ny_words are already features in wino! 
 ```
 
 
