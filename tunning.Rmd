@@ -94,7 +94,7 @@ control <- trainControl(method='repeatedcv',
                         number=10, 
                         repeats=3,
                         search = 'random')
-
+ x
 #Random generate 15 mtry values with tuneLength = 15
 set.seed(504)
 fit  <- train(province ~ .,
