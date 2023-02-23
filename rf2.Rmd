@@ -47,7 +47,7 @@ wine_words <- function(df, j = 1000, stem=F){
     mutate(across(-province, ~replace_na(.x, F)))
 }
 
-wino <- wine_words(wine, j=200, stem=T)
+wino <- wine_words(wine, j=400, stem=F)
 
 ```
 
@@ -87,6 +87,9 @@ wino = wino %>% mutate(diff_from_avg_lprice = mean(lprice) - lprice)
 
 wino = wino %>% mutate(cost_per_point = lprice/points) 
 
+wino = wino %>% select(-id)
+wino = wino %>% select(-diff_from_avg_lprice)
+
 ```
 
 initial set up for fitting model: 
@@ -121,13 +124,84 @@ weighted_wine = train %>%
   ))
 ```
 
+finding better new york words with logistic regression: 
+```{r}
+wine2 <-  read_rds("pinot.rds") %>% 
+  mutate(province = as.numeric(province=="New_York")) 
+
+wino2 <- wine_words(wine2, j = 400)
+
+wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
+
+train <- wino2[ wine_index, ]
+test <- wino2[-wine_index, ]
+
+control <- trainControl(method = "cv", number = 5)
+
+fit.ny <- train(province ~ .,
+             data = train, 
+             trControl = control,
+             method = "glm",
+             family = "binomial")
+
+#show the odds ratios for top coefficients
+odds_ratio <- exp(coef(fit.ny$finalModel))
+ny_words = data.frame(name = names(odds_ratio), odds_ratio = odds_ratio) %>%  
+  arrange(desc(odds_ratio))
+
+
+```
+
+now we've got a find a way to grab the words from ny_words and compare them with wino: 
 
 ```{r}
-tuneGrid = expand.grid(mtry = seq(10,20,1))
+ny_words = ny_words %>% mutate(ny = gsub('TRUE','',name)) %>% select(ny)
+ny_words$id = seq(1,nrow(ny_words),1)
+
+rownames(ny_words) = NULL
+
+ny_words = data.frame(ny_words)
+wino_vec = data.frame(colnames(wino))
+
+wino_vec = vector(wino_vec)
+wino_vec$id = seq(1,nrow(wino_vec),1)
+
+wino_vec$wino_vec
+class(wino_vec)
+arrange(wino_vec)
+
+words = vector()
+
+for(i in length(ny_words$ny)){
+  if (ny_words$ny[i] %in% wino_vec$wino_vec){
+    print("it's there")
+  } else{
+    print(ny_words$ny[i])
+  }
+}
+
+for (i in 1:length(ny_words$ny)){
+  print(ny_words$ny[1] %in% wino_vec$wino_vec)
+}
+
+
+cbind(ny_words$ny,wino_vec$wino_vec)
+
+unique_words = setdiff(ny_words$ny,wino_vec$wino_vec)
+
+sort(ny_words$ny)
+sort(wino_vec$wino_vec)
+```
+
+
+```{r}
+dim(wino)
+tuneGrid = expand.grid(mtry = 9)
 
 fit <- train(province ~ .,
              data = train, 
              method = "rf",
+             ntree = 100, 
              tuneGrid = tuneGrid,
              weights = weighted_wine$weights,
              trControl = ctrl,
@@ -135,6 +209,80 @@ fit <- train(province ~ .,
 
 confusionMatrix(predict(fit, test),factor(test$province))
 
+importance = varImp(fit)
+plot(importance)
 #best tune of mtry = 10
+```
+
+```{r}
+set.seed(1000000000)
+
+ctrl <- trainControl(method = "cv", number = 5)
+
+wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
+train <- wino[ wine_index, ]
+test <- wino[-wine_index, ]
+
+tuneGrid = expand.grid(mtry = 9)
+
+fit <- train(province ~ .,
+             data = train, 
+             method = "rf",
+             ntree = 100, 
+             tuneGrid = tuneGrid,
+             weights = weighted_wine$weights,
+             trControl = ctrl,
+             metric = "Kappa")
+
+confusionMatrix(predict(fit, test),factor(test$province))
+
+
+```
+
+
+
+
+
+
+
+doubling down on new york weight: 
+```{r}
+
+weighted_wine = train %>% 
+  mutate(weights = case_when(
+    province == "Burgundy" ~ as.numeric(province_dist[1,4]),
+    province == "California" ~ as.numeric(province_dist[2,4]),
+    province == "Casablanca_Valley" ~ as.numeric(province_dist[3,4]),
+    province == "Marlborough" ~ as.numeric(province_dist[4,4]),
+    province == "New_York" ~ as.numeric(province_dist[5,4])*2, #doubling new york weight
+    province == "Oregon" ~ as.numeric(province_dist[6,4]),
+  ))
+
+```
+
+tuning ntree hyperparameter: 
+
+```{r}
+
+
+tree_fits = list()
+
+for (ntree in c(500,1000,1500)){
+  set.seed(504)
+  fit.ntree = train(province ~ .,
+             data = train, 
+             method = "rf",
+             tuneGrid = fit$bestTune,
+             ntree = ntree,
+             weights = weighted_wine$weights,
+             trControl = ctrl,
+             metric = "Kappa")
+  
+  tree_fits = append(tree_fits, fit.ntree) 
+}
+
+
+tree_fits
+
 ```
 
