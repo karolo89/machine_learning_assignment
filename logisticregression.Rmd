@@ -13,9 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # add your libraries
 library(tidyverse)
 library(caret)
-library(rpart)
 library(scales)
-library(fastDummies)
 
 wine = readRDS(gzcon(url(
 "https://github.com/karolo89/machine_learning_assignment/raw/main/pinot.rds")))
@@ -90,11 +88,17 @@ wino = wino %>% select(-diff_from_avg_lprice)
 head(wino)
 
 ```
+```{r}
 
+library("DataExplorer")
+
+plot_intro(wino)
+
+```
 
 Split data
 ```{r}
-set.seed(504) 
+set.seed(100) 
 wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE) 
 
 train <- wino[ wine_index, ] 
@@ -114,7 +118,7 @@ Fit Model
 # Fit the mode
 
 control <- trainControl(method="cv", 
-                          number=5, 
+                          number=10, 
                           savePredictions="all",
                           classProbs=TRUE)
 
@@ -138,16 +142,27 @@ head(preds)
 postResample(test$province,preds)
 ```
 
+
 ```{r}
+predictors(model)
+
+```
+
+
+```{r}
+
 varImp(model)%>%
   arrange(desc(Overall))
 
 ```
 
 
+
+
 ```{r}
 confusionMatrix(predict(model, test),factor(test$province))
 
 ```
+
 
 
