@@ -1,5 +1,5 @@
 ---
-title: "Logistic Regression"
+title: "Logistic Regression & Elastic Net Regression"
 author: "Karol Orozco & Charles Hanks"
 format: pdf
 ---
@@ -164,5 +164,48 @@ confusionMatrix(predict(model, test),factor(test$province))
 
 ```
 
+## Elastic Net Regression
 
+```{r}
+# install.packages("devtools")
+# install.packages("glmnet", repos = "https://cran.us.r-project.org")
+
+library(glmnet)
+
+custom <- trainControl(method =  "cv",
+                       number = 5)
+                     
+```
+
+
+```{r, results= FALSE}
+#fitting Elastic Net Regression model
+
+set.seed(100)
+en <- train(province~.,
+            train,
+            method='glmnet',
+            tuneGrid =expand.grid(alpha=seq(0,1,length=10),
+                                  lambda = seq(0.0001,0.2,length=20)),
+            trControl=custom)
+
+```
+
+
+```{r}
+# Best tuning parameter 
+en$bestTune
+
+```
+
+
+```{r}
+
+varImp(en)
+```
+
+```{r}
+confusionMatrix(predict(en, test),factor(test$province))
+
+```
 
