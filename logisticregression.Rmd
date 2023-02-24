@@ -1,8 +1,7 @@
 ---
-title: "Logistic regression"
-author: "Charles & Karol"
-date: "2023-02-17"
-output: html_document
+title: "Logistic Regression & Glment"
+author: "Karol Orozco & Charles Hanks"
+format: pdf
 ---
 
 ```{r setup, include=FALSE}
@@ -14,9 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # add your libraries
 library(tidyverse)
 library(caret)
-library(rpart)
 library(scales)
-library(fastDummies)
 
 wine = readRDS(gzcon(url(
 "https://github.com/karolo89/machine_learning_assignment/raw/main/pinot.rds")))
@@ -91,35 +88,124 @@ wino = wino %>% select(-diff_from_avg_lprice)
 head(wino)
 
 ```
-
-
-## Split the data
-
 ```{r}
-set.seed(1000) 
+
+library("DataExplorer")
+
+plot_intro(wino)
+
+```
+
+Split data
+```{r}
+set.seed(100) 
 wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE) 
 
 train <- wino[ wine_index, ] 
 test <- wino[-wine_index, ] 
 
 table(train$province)
+
+nrow(train)
+nrow(test)
+
+
 ```
 
+Fit Model
 
 ```{r}
-# Fit the model
-model <- nnet::multinom(province ~., data = train)
+# Fit the mode
+
+control <- trainControl(method="cv", 
+                          number=10, 
+                          savePredictions="all",
+                          classProbs=TRUE)
+
+model <- nnet::multinom(province ~., 
+                        data = train,
+                        trControl=control)
+
+print(model)
+
 # Summarize the model
 summary(model)
+
 # Make predictions
-predicted.classes <- model %>% predict(test)
-head(predicted.classes)
+preds <- predict(model, type="class", newdata=test)
+
+head(preds)
 ```
 
 
 ```{r}
-# Model accuracy
-mean(predicted.classes == test$province)
+postResample(test$province,preds)
 ```
 
+
+```{r}
+predictors(model)
+
+```
+
+
+```{r}
+
+varImp(model)%>%
+  arrange(desc(Overall))
+
+```
+
+
+
+
+```{r}
+confusionMatrix(predict(model, test),factor(test$province))
+
+```
+
+## Elastic Net Regression
+
+```{r}
+# install.packages("devtools")
+# install.packages("glmnet", repos = "https://cran.us.r-project.org")
+
+library(glmnet)
+
+custom <- trainControl(method =  "cv",
+                       number = 5)
+                     
+```
+
+
+```{r, results= FALSE}
+#fitting Elastic Net Regression model
+
+set.seed(100)
+en <- train(province~.,
+            train,
+            method='glmnet',
+            tuneGrid =expand.grid(alpha=seq(0,1,length=10),
+                                  lambda = seq(0.0001,0.2,length=20)),
+            trControl=custom)
+
+```
+
+
+```{r}
+# Best tuning parameter 
+en$bestTune
+
+```
+
+
+```{r}
+
+varImp(en)
+```
+
+```{r}
+confusionMatrix(predict(en, test),factor(test$province))
+
+```
 
