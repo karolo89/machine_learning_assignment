@@ -10,13 +10,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Setup
 
-```{r}
+```{r, warning= FALSE, message=FALSE}
 # add your libraries
 library(tidyverse)
 library(caret)
 library(rpart)
 library(glmnet)
-library(fastDummies)
 
 
 wine = read_rds("pinot.rds")
@@ -122,7 +121,6 @@ confusionMatrix(predict(fit, test),factor(test$province))
 varImp(fit) 
 ?varImp()
   
-varImp(fit) %>% plot()
 ```
 
 ## Best model
@@ -141,7 +139,7 @@ print(fit$bestTune)
 ```{r}
 # the "method" below should match the one you chose above. 
 
-set.seed(1504) # I will choose a different seed for evaluation
+set.seed(504) # I will choose a different seed for evaluation
 
 wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
 train <- wino[ wine_index, ]
