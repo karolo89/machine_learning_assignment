@@ -129,7 +129,8 @@ finding better new york words with logistic regression:
 wine2 <-  read_rds("pinot.rds") %>% 
   mutate(province = as.numeric(province=="New_York")) 
 
-wino2 <- wine_words(wine2, j = 400)
+
+wino2 <- wine_words(wine2, j = 50)
 
 wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
 
@@ -146,8 +147,15 @@ fit.ny <- train(province ~ .,
 
 #show the odds ratios for top coefficients
 odds_ratio <- exp(coef(fit.ny$finalModel))
-ny_words = data.frame(name = names(odds_ratio), odds_ratio = odds_ratio) %>%  
+ny_words = data.frame(name = names(odds_ratio), odds_ratio = round(odds_ratio,2)) %>%  
   arrange(desc(odds_ratio))
+
+ny_words = ny_words %>% mutate(name = gsub("TRUE", "", name)) %>% mutate(name = gsub("`\\\\`", "", name)) %>% mutate(name = gsub("\\\\``", "", name))
+
+
+colnames(wino)
+ny_words$name
+
 
 
 ```
@@ -155,42 +163,18 @@ ny_words = data.frame(name = names(odds_ratio), odds_ratio = odds_ratio) %>%
 now we've got a find a way to grab the words from ny_words and compare them with wino: 
 
 ```{r}
-ny_words = ny_words %>% mutate(ny = gsub('TRUE','',name)) %>% select(ny)
-ny_words$id = seq(1,nrow(ny_words),1)
-
+ny_words = ny_words %>% select(ny)
 rownames(ny_words) = NULL
 
 ny_words = data.frame(ny_words)
 wino_vec = data.frame(colnames(wino))
 
-wino_vec = vector(wino_vec)
-wino_vec$id = seq(1,nrow(wino_vec),1)
+colnames(wino_vec)[1] = "features"
 
-wino_vec$wino_vec
-class(wino_vec)
-arrange(wino_vec)
+setdiff(ny_words$ny, wino_vec$features)
 
-words = vector()
+#no words in ny_words that are not already a feature in wino ds. 
 
-for(i in length(ny_words$ny)){
-  if (ny_words$ny[i] %in% wino_vec$wino_vec){
-    print("it's there")
-  } else{
-    print(ny_words$ny[i])
-  }
-}
-
-for (i in 1:length(ny_words$ny)){
-  print(ny_words$ny[1] %in% wino_vec$wino_vec)
-}
-
-
-cbind(ny_words$ny,wino_vec$wino_vec)
-
-unique_words = setdiff(ny_words$ny,wino_vec$wino_vec)
-
-sort(ny_words$ny)
-sort(wino_vec$wino_vec)
 ```
 
 

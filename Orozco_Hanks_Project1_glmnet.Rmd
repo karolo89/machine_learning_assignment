@@ -16,7 +16,10 @@ library(tidyverse)
 library(caret)
 library(rpart)
 library(glmnet)
+<<<<<<< HEAD
 
+=======
+>>>>>>> 6fce7ee249f70b31a4e576fa95332f81bb79c806
 
 wine = read_rds("pinot.rds")
 
@@ -27,7 +30,6 @@ wine = read_rds("pinot.rds")
 
 ```{r}
 # create some cool features. Make sure you add comments so I know what you are trying to accomplish!
-
 wine_words <- function(df, j = 1000, stem=F){ 
   library(tidytext)
   library(SnowballC)
@@ -66,7 +68,17 @@ wino = wino %>% select(points) %>% preProcess(method = c("center", "scale")) %>%
 
 #creating year as factor feature, logprice: 
 wino = wino %>% mutate(lprice = log(price))
-                       
+
+
+  
+#removing original price                    
+wino = wino %>% select(-price)
+
+
+  
+#removing original price                    
+wino = wino %>% select(-price)
+
 
 #binning year and and price: 
 wino = wino %>% 
@@ -84,8 +96,79 @@ wino = wino %>%
 #adding cost per point feature, removing id column: 
 wino = wino %>% select(-id, -price)
 
+
 ```
 
+
+Running a logistic regression model to select words that are of high impact to NY: 
+```{r}
+wine2 <-  read_rds("pinot.rds") %>% 
+  mutate(province = as.numeric(province=="New_York")) 
+
+
+wino2 <- wine_words(wine2, j = 50)
+
+wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
+
+train <- wino2[ wine_index, ]
+test <- wino2[-wine_index, ]
+
+control <- trainControl(method = "cv", number = 5)
+
+fit.ny <- train(province ~ .,
+             data = train, 
+             trControl = control,
+             method = "glm",
+             family = "binomial")
+
+#show the odds ratios for top coefficients
+odds_ratio <- exp(coef(fit.ny$finalModel))
+ny_words = data.frame(name = names(odds_ratio), odds_ratio = round(odds_ratio,2)) %>%  
+  arrange(desc(odds_ratio))
+
+#cleaning up column of words
+ny_words = ny_words %>% mutate(name = gsub("TRUE", "", name)) %>% mutate(name = gsub("`\\\\`", "", name)) %>% mutate(name = gsub("\\\\``", "", name))
+
+
+ny_words$name
+features = colnames(wino)
+
+
+
+length(features)
+
+nyc = ny_words$name[1:185]
+
+nyc = setdiff(nyc, features)[1:30]
+
+
+nyc_words <- wine %>%
+    unnest_tokens(word, description) %>%
+    anti_join(stop_words) %>% 
+    count(id, word) %>% 
+    group_by(id) %>% 
+    mutate(exists = (n>0)) %>% 
+    ungroup %>% 
+    group_by(word) %>% 
+    mutate(total = sum(n)) %>% 
+    filter(word %in% nyc) %>% 
+    pivot_wider(id_cols = id, names_from = word, values_from = exists, values_fill = list(exists=0)) %>% 
+    right_join(select(wine,id,province)) %>% 
+    mutate(across(-province, ~replace_na(.x, F)))
+
+nyc_words = nyc_words %>% arrange(id) %>% select(-province)
+
+wino = wino %>% inner_join(nyc_words, by = 'id')
+
+wino = wino %>% select(-id)
+
+
+```
+
+
+
+
+=======
 
 ## Specification
 
@@ -115,13 +198,22 @@ fit <- train(province ~ .,
 
 confusionMatrix(predict(fit, test),factor(test$province))
 
+
+
+
 ```
 
+<<<<<<< HEAD
 ```{r}
 varImp(fit) 
 ?varImp()
   
 ```
+=======
+
+
+
+>>>>>>> 6fce7ee249f70b31a4e576fa95332f81bb79c806
 
 ## Best model
 
@@ -130,7 +222,6 @@ varImp(fit)
 print(fit)
 print(fit$bestTune)
 
-
 ```
 
 
@@ -138,8 +229,12 @@ print(fit$bestTune)
 
 ```{r}
 # the "method" below should match the one you chose above. 
+<<<<<<< HEAD
 
 set.seed(504) # I will choose a different seed for evaluation
+=======
+set.seed(411) # I will choose a different seed for evaluation
+>>>>>>> 6fce7ee249f70b31a4e576fa95332f81bb79c806
 
 wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
 train <- wino[ wine_index, ]
