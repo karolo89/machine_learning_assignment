@@ -65,9 +65,16 @@ wino = wino %>% select(points) %>% preProcess(method = c("center", "scale")) %>%
 #creating year as factor feature, logprice: 
 wino = wino %>% mutate(lprice = log(price))
 
+
   
 #removing original price                    
 wino = wino %>% select(-price)
+
+
+  
+#removing original price                    
+wino = wino %>% select(-price)
+
 
 #binning year and and price: 
 wino = wino %>% 
@@ -87,7 +94,6 @@ wino = wino %>% select(-id, -price)
 
 
 ```
-
 
 
 Running a logistic regression model to select words that are of high impact to NY: 
@@ -194,7 +200,7 @@ confusionMatrix(predict(fit, test),factor(test$province))
 ```
 
 
-=======
+
 
 
 ## Best model
@@ -204,7 +210,6 @@ confusionMatrix(predict(fit, test),factor(test$province))
 print(fit)
 print(fit$bestTune)
 
-
 ```
 
 
@@ -212,7 +217,6 @@ print(fit$bestTune)
 
 ```{r}
 # the "method" below should match the one you chose above. 
-
 set.seed(411) # I will choose a different seed for evaluation
 
 wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
