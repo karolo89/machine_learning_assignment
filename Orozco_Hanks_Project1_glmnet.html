@@ -359,43 +359,27 @@ benchmark</h1>
 <div id="setup" class="section level2">
 <h2>Setup</h2>
 <pre class="r"><code># add your libraries
-library(tidyverse)</code></pre>
-<pre><code>## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.2 ──
-## ✔ ggplot2 3.4.0     ✔ purrr   1.0.1
-## ✔ tibble  3.1.8     ✔ dplyr   1.1.0
-## ✔ tidyr   1.3.0     ✔ stringr 1.5.0
-## ✔ readr   2.1.3     ✔ forcats 1.0.0
-## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
-## ✖ dplyr::filter() masks stats::filter()
-## ✖ dplyr::lag()    masks stats::lag()</code></pre>
-<pre class="r"><code>library(caret)</code></pre>
-<pre><code>## Loading required package: lattice
-## 
-## Attaching package: &#39;caret&#39;
-## 
-## The following object is masked from &#39;package:purrr&#39;:
-## 
-##     lift</code></pre>
-<pre class="r"><code>library(rpart)
-library(glmnet)</code></pre>
-<pre><code>## Loading required package: Matrix
-## 
-## Attaching package: &#39;Matrix&#39;
-## 
-## The following objects are masked from &#39;package:tidyr&#39;:
-## 
-##     expand, pack, unpack
-## 
-## Loaded glmnet 4.1-6</code></pre>
-<pre class="r"><code>wine = read_rds(&quot;pinot.rds&quot;)</code></pre>
+
+# Modeling packages
+library(glmnet)   # for implementing regularized regression
+library(caret)    # for automating the tuning process
+
+library(tidyverse)
+
+
+
+
+wine = read_rds(&quot;pinot.rds&quot;)</code></pre>
 </div>
 <div id="feature-engineering" class="section level2">
 <h2>Feature Engineering</h2>
 <pre class="r"><code># create some cool features. Make sure you add comments so I know what you are trying to accomplish!
+
 wine_words &lt;- function(df, j = 1000, stem=F){ 
   library(tidytext)
   library(SnowballC)
   data(stop_words)
+  
   words &lt;- df %&gt;%
     unnest_tokens(word, description) %&gt;%
     anti_join(stop_words) %&gt;% # get rid of stop words
@@ -419,10 +403,9 @@ wine_words &lt;- function(df, j = 1000, stem=F){
     mutate(across(-province, ~replace_na(.x, F)))
 }
 
-wino &lt;- wine_words(wine, j=200, stem=F)</code></pre>
-<pre><code>## Joining with `by = join_by(word)`
-## Joining with `by = join_by(id)`</code></pre>
-<pre class="r"><code>#bringing back numerical features from original dataset to wino:
+wino &lt;- wine_words(wine, j=200, stem=F)
+
+#bringing back numerical features from original dataset to wino:
 wino = wino %&gt;% left_join(select(wine, id, price, points, year), by = &quot;id&quot;) 
   
 #center and scale points: 
@@ -431,9 +414,9 @@ wino = wino %&gt;% select(points) %&gt;% preProcess(method = c(&quot;center&quot
 #creating year as factor feature, logprice: 
 wino = wino %&gt;% mutate(lprice = log(price))
 
+
 #removing original price                    
 wino = wino %&gt;% select(-price)</code></pre>
-<p>=======</p>
 </div>
 <div id="specification" class="section level2">
 <h2>Specification</h2>
@@ -448,10 +431,8 @@ ctrl &lt;- trainControl(method = &quot;cv&quot;, number = 5)
 
 wine_index &lt;- createDataPartition(wino$province, p = 0.80, list = FALSE)
 train &lt;- wino[ wine_index, ]
-test &lt;- wino[-wine_index, ]
-
-
-fit &lt;- train(province ~ .,
+test &lt;- wino[-wine_index, ]</code></pre>
+<pre class="r"><code>fit &lt;- train(province ~ .,
              data = train, 
              method = &quot;glmnet&quot;,
              tuneGrid = expand.grid(alpha=seq(0,1,length=10),
@@ -738,7 +719,7 @@ print(fit)</code></pre>
 <div id="re-fit-and-evaluation" class="section level2">
 <h2>Re-fit and evaluation</h2>
 <pre class="r"><code># the &quot;method&quot; below should match the one you chose above. 
-set.seed(411) # I will choose a different seed for evaluation
+set.seed(504) # I will choose a different seed for evaluation
 
 wine_index &lt;- createDataPartition(wino$province, p = 0.80, list = FALSE)
 train &lt;- wino[ wine_index, ]
@@ -756,52 +737,52 @@ confusionMatrix(predict(fit_final, test),factor(test$province))</code></pre>
 ## 
 ##                    Reference
 ## Prediction          Burgundy California Casablanca_Valley Marlborough New_York
-##   Burgundy               226          5                 0           0        0
-##   California               3        733                 9           8        9
+##   Burgundy               223          3                 1           0        0
+##   California               3        743                 8           7       13
 ##   Casablanca_Valley        0          0                14           0        0
-##   Marlborough              0          1                 0          23        3
-##   New_York                 0          0                 0           0       12
-##   Oregon                   9         52                 3          14        2
+##   Marlborough              0          0                 0          31        2
+##   New_York                 0          0                 0           0        8
+##   Oregon                  12         45                 3           7        3
 ##                    Reference
 ## Prediction          Oregon
-##   Burgundy               2
-##   California            35
+##   Burgundy               4
+##   California            36
 ##   Casablanca_Valley      0
-##   Marlborough            1
+##   Marlborough            0
 ##   New_York               0
-##   Oregon               509
+##   Oregon               507
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9068          
-##                  95% CI : (0.8918, 0.9203)
+##                Accuracy : 0.9121          
+##                  95% CI : (0.8975, 0.9253)
 ##     No Information Rate : 0.4728          
 ##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
 ##                                           
-##                   Kappa : 0.8541          
+##                   Kappa : 0.8623          
 ##                                           
 ##  Mcnemar&#39;s Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: Burgundy Class: California Class: Casablanca_Valley
-## Sensitivity                   0.9496            0.9267                 0.538462
-## Specificity                   0.9951            0.9274                 1.000000
-## Pos Pred Value                0.9700            0.9197                 1.000000
-## Neg Pred Value                0.9917            0.9338                 0.992767
+## Sensitivity                   0.9370            0.9393                 0.538462
+## Specificity                   0.9944            0.9240                 1.000000
+## Pos Pred Value                0.9654            0.9173                 1.000000
+## Neg Pred Value                0.9896            0.9444                 0.992767
 ## Prevalence                    0.1423            0.4728                 0.015541
-## Detection Rate                0.1351            0.4381                 0.008368
-## Detection Prevalence          0.1393            0.4764                 0.008368
-## Balanced Accuracy             0.9724            0.9271                 0.769231
+## Detection Rate                0.1333            0.4441                 0.008368
+## Detection Prevalence          0.1381            0.4842                 0.008368
+## Balanced Accuracy             0.9657            0.9317                 0.769231
 ##                      Class: Marlborough Class: New_York Class: Oregon
-## Sensitivity                     0.51111        0.461538        0.9305
-## Specificity                     0.99693        1.000000        0.9290
-## Pos Pred Value                  0.82143        1.000000        0.8642
-## Neg Pred Value                  0.98663        0.991571        0.9649
+## Sensitivity                     0.68889        0.307692        0.9269
+## Specificity                     0.99877        1.000000        0.9378
+## Pos Pred Value                  0.93939        1.000000        0.8787
+## Neg Pred Value                  0.99146        0.989189        0.9635
 ## Prevalence                      0.02690        0.015541        0.3270
-## Detection Rate                  0.01375        0.007173        0.3042
-## Detection Prevalence            0.01674        0.007173        0.3521
-## Balanced Accuracy               0.75402        0.730769        0.9297</code></pre>
+## Detection Rate                  0.01853        0.004782        0.3030
+## Detection Prevalence            0.01973        0.004782        0.3449
+## Balanced Accuracy               0.84383        0.653846        0.9324</code></pre>
 </div>
 
 
