@@ -16,8 +16,6 @@ library(tidyverse)
 library(caret)
 library(rpart)
 library(glmnet)
-library(fastDummies)
-
 
 wine = read_rds("pinot.rds")
 
@@ -28,7 +26,6 @@ wine = read_rds("pinot.rds")
 
 ```{r}
 # create some cool features. Make sure you add comments so I know what you are trying to accomplish!
-
 wine_words <- function(df, j = 1000, stem=F){ 
   library(tidytext)
   library(SnowballC)
@@ -67,11 +64,30 @@ wino = wino %>% select(points) %>% preProcess(method = c("center", "scale")) %>%
 
 #creating year as factor feature, logprice: 
 wino = wino %>% mutate(lprice = log(price))
+
   
 #removing original price                    
 wino = wino %>% select(-price)
 
+#binning year and and price: 
+wino = wino %>% 
+  mutate(price_f = case_when(
+    price < 16 ~ "low",
+    price >= 16 & price < 41 ~ "med",
+    price >= 41 ~ "high"
+  ), 
+   year_f = case_when(
+    year < 2005 ~ "old",
+    year >= 2005 & year < 2011 ~ "recent",
+    year >= 2011 ~ "current"
+  ))
+
+#adding cost per point feature, removing id column: 
+wino = wino %>% select(-id, -price)
+
+
 ```
+
 
 
 Running a logistic regression model to select words that are of high impact to NY: 
@@ -142,6 +158,8 @@ wino = wino %>% select(-id)
 
 
 
+=======
+
 ## Specification
 
 ```{r}
@@ -172,8 +190,11 @@ confusionMatrix(predict(fit, test),factor(test$province))
 
 
 
+
 ```
 
+
+=======
 
 
 ## Best model
@@ -192,7 +213,7 @@ print(fit$bestTune)
 ```{r}
 # the "method" below should match the one you chose above. 
 
-set.seed(369) # I will choose a different seed for evaluation
+set.seed(411) # I will choose a different seed for evaluation
 
 wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
 train <- wino[ wine_index, ]

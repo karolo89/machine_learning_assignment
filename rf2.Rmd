@@ -129,7 +129,8 @@ finding better new york words with logistic regression:
 wine2 <-  read_rds("pinot.rds") %>% 
   mutate(province = as.numeric(province=="New_York")) 
 
-wino2 <- wine_words(wine2, j = 400)
+
+wino2 <- wine_words(wine2, j = 50)
 
 wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
 
@@ -146,8 +147,15 @@ fit.ny <- train(province ~ .,
 
 #show the odds ratios for top coefficients
 odds_ratio <- exp(coef(fit.ny$finalModel))
-ny_words = data.frame(name = names(odds_ratio), odds_ratio = odds_ratio) %>%  
+ny_words = data.frame(name = names(odds_ratio), odds_ratio = round(odds_ratio,2)) %>%  
   arrange(desc(odds_ratio))
+
+ny_words = ny_words %>% mutate(name = gsub("TRUE", "", name)) %>% mutate(name = gsub("`\\\\`", "", name)) %>% mutate(name = gsub("\\\\``", "", name))
+
+
+colnames(wino)
+ny_words$name
+
 
 
 ```
