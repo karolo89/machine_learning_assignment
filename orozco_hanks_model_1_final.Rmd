@@ -62,8 +62,6 @@ wino = wino %>% left_join(select(wine, id, price, points, year), by = "id")
 #scaling & center points
 wino = wino %>% select(points) %>% preProcess(method = c("center", "scale")) %>% predict(wino)
   
-#creating year as factor feature, logprice: 
-wino = wino %>% mutate(lprice = log(price))
 
 wino = wino %>% 
   mutate(price_f = case_when(
@@ -77,9 +75,9 @@ wino = wino %>%
     year >= 2011 ~ "current"
   ))
 
-wino = wino %>% select(-price,-lprice,-year)
+wino = wino %>% select(-price,-year)
 
-#We ran a elastic net model from wino dataset generate from the function above with j = 200 and got a kappa in the .80s. However, New York was not performing well in this model. So we decided to run a separate glm model with province == New York as our response variable to gather more influential words for predicting New York:
+#We ran a elastic net model from wino dataset generated from the function above with j = 200 and got a kappa in the .80s. However, New York was not performing well in this model. So we decided to run a separate glm model with province == New York as our response variable to gather more influential words for predicting New York:
 
 wine2 <-  read_rds("pinot.rds") %>% 
   mutate(province = as.factor(as.numeric(province=="New_York")))
@@ -161,11 +159,11 @@ wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
 train <- wino[ wine_index, ]
 test <- wino[-wine_index, ]
 
-
+#training model on a sequence of values of alpha and lambda to find optimal regularization
 fit <- train(province ~ .,
              data = train, 
              method = "glmnet",
-             tuneGrid = expand.grid(alpha=seq(0,1,length=10), ##training model on a sequence of values of alpha and lambda to find optimal regularization
+             tuneGrid = expand.grid(alpha=seq(0,1,length=10), 
                                     lambda = seq(0.0001,0.2,
                                     length=20)),
              trControl = ctrl,
@@ -181,7 +179,7 @@ confusionMatrix(predict(fit, test),factor(test$province))
 # Here are a few lines to inspect your best model. Add some comments about optimal hyperparameters.
 print(fit)
 print(fit$bestTune)
-#Best value for alpha: 0, lamba: 0.01
+#Best value for alpha: 0, lambda: 0.01
 #This means that there are many predictors with similar coefficients that impact the response variable, so ridge regression is more effective. 
 
 ```
@@ -198,7 +196,7 @@ wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
 train <- wino[ wine_index, ]
 test <- wino[-wine_index, ]
 
-# example spec for knn
+# spec for glmnet
 fit_final <- train(province ~ .,
              data = train, 
              method = "glmnet",
