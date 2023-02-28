@@ -1,0 +1,211 @@
+---
+title: "Modeling Assignment 1"
+author: "Karol Orozco & Charles Hanks"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+
+```{r}
+#libraries
+library(tidyverse)
+library(caret)
+library(glmnet)
+
+
+wine = read_rds("pinot.rds")
+
+```
+
+
+## Feature Engineering
+
+```{r}
+# create some cool features. Make sure you add comments so I know what you are trying to accomplish!
+
+wine_words <- function(df, j = 1000, stem=F){ 
+  library(tidytext)
+  library(SnowballC)
+  data(stop_words)
+  words <- df %>%
+    unnest_tokens(word, description) %>%
+    anti_join(stop_words) %>% # get rid of stop words
+    filter(!(word %in% c("wine","pinot","vineyard", "price", "points")))
+  
+  if(stem){
+    words <- words %>% 
+      mutate(word = wordStem(word))
+  }
+  
+  words <- words %>% 
+    count(id, word) %>% 
+    group_by(id) %>% 
+    mutate(exists = (n>0)) %>% 
+    ungroup %>% 
+    group_by(word) %>% 
+    mutate(total = sum(n)) %>% 
+    filter(total > j) %>% 
+    pivot_wider(id_cols = id, names_from = word, values_from = exists, values_fill = list(exists=0)) %>% 
+    right_join(select(df,id,province)) %>% 
+    mutate(across(-province, ~replace_na(.x, F)))
+}
+
+wino <- wine_words(wine, j=200, stem=F)
+
+#bringing back numerical features from original dataset to wino:
+wino = wino %>% left_join(select(wine, id, price, points, year), by = "id") 
+
+#scaling & center points
+wino = wino %>% select(points) %>% preProcess(method = c("center", "scale")) %>% predict(wino)
+  
+#creating year as factor feature, logprice: 
+wino = wino %>% mutate(lprice = log(price))
+
+wino = wino %>% 
+  mutate(price_f = case_when(
+    price < 16 ~ "low",
+    price >= 16 & price < 41 ~ "med",
+    price >= 41 ~ "high"
+  ), 
+   year_f = case_when(
+    year < 2005 ~ "old",
+    year >= 2005 & year < 2011 ~ "recent",
+    year >= 2011 ~ "current"
+  ))
+
+wino = wino %>% select(-price,-lprice,-year)
+
+#We ran a elastic net model from wino dataset generate from the function above with j = 200 and got a kappa in the .80s. However, New York was not performing well in this model. So we decided to run a separate glm model with province == New York as our response variable to gather more influential words for predicting New York:
+
+wine2 <-  read_rds("pinot.rds") %>% 
+  mutate(province = as.factor(as.numeric(province=="New_York")))
+
+wine2 = wine2 %>% mutate(province = as.factor(province))
+
+#new dataset with lower total (because New York is more rare province in the original pinot dataset)
+wino2 <- wine_words(wine2, j = 50)
+
+wine_index <- createDataPartition(wino2$province, p = 0.80, list = FALSE)
+train <- wino2[ wine_index, ]
+test <- wino2[-wine_index, ]
+
+control <- trainControl(method = "cv", number = 5)
+
+fit.ny <- train(province ~ .,
+             data = train, 
+             trControl = control,
+             method = "glm",
+             family = "binomial")
+
+#show the odds ratios for top coefficients
+odds_ratio <- exp(coef(fit.ny$finalModel))
+
+ny_words = data.frame(name = names(odds_ratio), odds_ratio = round(odds_ratio,2)) %>%  
+  arrange(desc(odds_ratio))
+
+#cleaning up column of words
+ny_words = ny_words %>% mutate(name = gsub("TRUE", "", name)) %>% mutate(name = gsub("`\\\\`", "", name)) %>% mutate(name = gsub("\\\\``", "", name))
+
+features = colnames(wino)
+
+nyc = ny_words$name[1:185]
+
+#selecting words that do not show up in features from  wino
+nyc = setdiff(nyc, features)
+
+#grabbing the top 40 of these New York words:
+nyc = nyc[1:40]
+
+#transforming these 40 words into features 
+nyc_words <- wine %>%
+    unnest_tokens(word, description) %>%
+    anti_join(stop_words) %>% 
+    count(id, word) %>% 
+    group_by(id) %>% 
+    mutate(exists = (n>0)) %>% 
+    ungroup %>% 
+    group_by(word) %>% 
+    mutate(total = sum(n)) %>% 
+    filter(word %in% nyc) %>% 
+    pivot_wider(id_cols = id, names_from = word, values_from = exists, values_fill = list(exists=0)) %>% 
+    right_join(select(wine,id,province)) %>% 
+    mutate(across(-province, ~replace_na(.x, F)))
+
+nyc_words = nyc_words %>% arrange(id) %>% select(-province)
+
+#joining new features to wino, then removing id column: 
+wino = wino %>% inner_join(nyc_words, by = 'id') %>% select(-id)
+
+
+
+```
+
+
+## Specification
+
+```{r}
+#Model: ELASTIC NET REGRESSION
+#Tuning parameters: 
+#   1. lambda - regularization/penalty enforcement to minimize prediction error)
+#   2, alpha  - mixing parameter between 0 and 1, where alpha = 0 is ridge regression, and alpha = 1 is lasso regression)
+
+set.seed(600) 
+
+ctrl <- trainControl(method = "cv", number = 5)
+
+wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
+train <- wino[ wine_index, ]
+test <- wino[-wine_index, ]
+
+
+fit <- train(province ~ .,
+             data = train, 
+             method = "glmnet",
+             tuneGrid = expand.grid(alpha=seq(0,1,length=10), ##training model on a sequence of values of alpha and lambda to find optimal regularization
+                                    lambda = seq(0.0001,0.2,
+                                    length=20)),
+             trControl = ctrl,
+             metric = "Kappa")
+
+confusionMatrix(predict(fit, test),factor(test$province))
+
+```
+
+## Best model
+
+```{r}
+# Here are a few lines to inspect your best model. Add some comments about optimal hyperparameters.
+print(fit)
+print(fit$bestTune)
+#Best value for alpha: 0, lamba: 0.01
+#This means that there are many predictors with similar coefficients that impact the response variable, so ridge regression is more effective. 
+
+```
+
+
+## Re-fit and evaluation
+
+```{r}
+# the "method" below should match the one you chose above. 
+
+set.seed(999) # I will choose a different seed for evaluation
+
+wine_index <- createDataPartition(wino$province, p = 0.80, list = FALSE)
+train <- wino[ wine_index, ]
+test <- wino[-wine_index, ]
+
+# example spec for knn
+fit_final <- train(province ~ .,
+             data = train, 
+             method = "glmnet",
+             tuneGrid=fit$bestTune) 
+
+# The last line means we will fit a model using the best tune parameters your CV found above.
+
+confusionMatrix(predict(fit_final, test),factor(test$province))
+```
+
